@@ -1,22 +1,16 @@
-p = [
+class Blowfish:
+    enc = 404
+    dec = 404
+    def __init__(self):
+
+        self.p =  [
       0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344,
       0xA4093822, 0x299F31D0, 0x082EFA98, 0xEC4E6C89,
       0x452821E6, 0x38D01377, 0xBE5466CF, 0x34E90C6C,
       0xC0AC29B7, 0xC97C50DD, 0x3F84D5B5, 0xB5470917,
       0x9216D5D9, 0x8979FB1B
   ]
-
-
-p_saved = [
-      0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344,
-      0xA4093822, 0x299F31D0, 0x082EFA98, 0xEC4E6C89,
-      0x452821E6, 0x38D01377, 0xBE5466CF, 0x34E90C6C,
-      0xC0AC29B7, 0xC97C50DD, 0x3F84D5B5, 0xB5470917,
-      0x9216D5D9, 0x8979FB1B
-  ]
-
-
-s = [
+        self.s = [
       [
           0xD1310BA6, 0x98DFB5AC, 0x2FFD72DB, 0xD01ADFB7,
           0xB8E1AFED, 0x6A267E96, 0xBA7C9045, 0xF12C7F99,
@@ -282,22 +276,124 @@ s = [
           0xB74E6132, 0xCE77E25B, 0x578FDFE3, 0x3AC372E6
       ]
 ]
-s_saved = s
 
-key = [ 0x4B7A70E9, 0xB5B32944, 0xDB75092E, 0xC4192623,
+
+        self.key = [ 0x4B7A70E9, 0xB5B32944, 0xDB75092E, 0xC4192623,
         0xAD6EA6B0, 0x49A7DF7D, 0x9CEE60B8, 0x8FEDB266,
         0xECAA8C71, 0x699A17FF, 0x5664526C, 0xC2B19EE1,
         0x193602A5, 0x75094C29]
 
-p_new = p.copy()
 
-def swap(a,b):
-    temp = a
-    a = b
-    b = temp
-    return a,b
+    def driver(self, plaintext):
 
-def driver(plaintext):
+        for i in range(0,18):
+            self.p[i] = self.p[i]^self.key[i%14]
+        k = 0
+        data = 0
+        for i in range(0,9):
+            temp = self.encryption(data)
+            self.p[k] = temp >> 32
+            k+=1
+            self.p[k] = temp & 0xffffffff
+            k+=1
+            data = temp
+        encrypt_data = plaintext
+        encrypted_data = self.encryption(encrypt_data)
+        result_enc =   str(hex(encrypted_data))[2:]
+        print("Encrypted data : ", result_enc)
+        decrypted_data = self.decryption(encrypted_data)
+        print("Decrypted data : ", str(hex(decrypted_data))[2:])
+        result_dec = str(hex(decrypted_data))[2:]
+        return result_enc, result_dec
+
+
+    def driver_key(self):
+        for i in range(0,18):
+            self.p[i] = self.p[i]^self.key[i%14]
+        k = 0
+        data = 0
+        for i in range(0,9):
+            temp = self.encryption(data)
+            self.p[k] = temp >> 32
+            k+=1
+            self.p[k] = temp & 0xffffffff
+            k+=1
+            data = temp
+
+
+    def encryption(self, data):
+        L = data>>32
+        R = data & 0xffffffff # {1} ^ 32
+        for i in range(0,16): #16 rounds
+            L = self.p[i]^L
+            L1 = self.func(L)
+            R = R^self.func(L1)
+            L,R = R, L
+        L,R = R, L
+        L = L^self.p[17]
+        R = R^self.p[16]
+        encrypted = (L<<32) ^ R
+        return encrypted
+
+
+    def func(self, L):
+        temp = self.s[0][L >> 24]
+        temp = (temp + self.s[1][L >> 16 & 0xff]) % 2**32
+        temp = temp ^ self.s[2][L >> 8 & 0xff]
+        temp = (temp + self.s[3][L & 0xff]) % 2**32
+        return temp
+
+    def decryption(self, data):
+        L = data >> 32
+        R = data & 0xffffffff
+        for i in range(17, 1, -1):
+            L = self.p[i]^L
+            L1 = self.func(L)
+            R = R^self.func(L1)
+            L,R = R, L
+        L,R = R, L
+        L = L^self.p[0]
+        R = R^self.p[1]
+        decrypted_data1 = (L<<32) ^ R
+        return decrypted_data1
+
+
+    def blowfish_decrypt_string(self, password_hex):
+        print('Decryption')
+        plaintext = password_hex
+        total_message = []
+        total_message_int = []
+        count_blocks = 0
+        for i in range(0, len(plaintext) // 16):
+            block = plaintext[i*16: (1+i)*16]
+            total_message.append(block)
+            block_hex = int(block, 16)
+            total_message_int.append((block_hex))
+            count_blocks += 1
+        if len(plaintext) % 16 != 0:
+            total_message.append(plaintext[16*count_blocks:])
+            total_message_int.append(int(plaintext[16*count_blocks:], 16))
+        print('Total message to decrypt:    ', total_message)
+        print('Message to decrypt (ascii):  ', ''.join(total_message))
+        print('int value of the message:    ', total_message_int)
+        result_dec = []
+        for message in total_message_int:
+            hex_string_block = self.driver_dec(message)
+            print('Hex result:  ', hex_string_block)
+            char = bytes.fromhex(hex_string_block).decode() 
+            print('Char 8 bytes:    ', char)
+
+            result_dec.append(char)
+            decrypted = ''.join(result_dec)
+        print('DECRYPTED:   ', decrypted)
+
+        return decrypted
+
+
+
+
+
+    def driver_dec(self, password):
         #p = p_saved
         '''
         for i in range(0,18):
@@ -312,235 +408,57 @@ def driver(plaintext):
             k+=1
             data = temp
         '''
-        encrypt_data = plaintext
-        encrypted_data = encryption(encrypt_data)
-        result_enc =   str(hex(encrypted_data))[2:]
-        print("Encrypted data : ", result_enc)
-        decrypted_data = decryption(encrypted_data)
-        print("Decrypted data : ", str(hex(decrypted_data))[2:])
-        result_dec = str(hex(decrypted_data))[2:]
-        return result_enc, result_dec
-def driver_key():
-
-        p = p_saved
-        for i in range(0,18):
-            p[i] = p[i]^key[i%14]
-        k = 0
-        data = 0
-        for i in range(0,9):
-            temp = encryption(data)
-            p[k] = temp >> 32
-            k+=1
-            p[k] = temp & 0xffffffff
-            k+=1
-            data = temp
-
-def encryption(data):
-        L = data>>32
-        R = data & 0xffffffff # {1} ^ 32
-        for i in range(0,16): #16 rounds
-                L = p[i]^L
-                L1 = func(L)
-                R = R^func(L1)
-                L,R = swap(L,R)
-        L,R = swap(L,R)
-        L = L^p[17]
-        R = R^p[16]
-        encrypted = (L<<32) ^ R
-        return encrypted
-
-
-def func(L):
-    temp = s[0][L >> 24]
-    temp = (temp + s[1][L >> 16 & 0xff]) % 2**32
-    temp = temp ^ s[2][L >> 8 & 0xff]
-    temp = (temp + s[3][L & 0xff]) % 2**32
-    return temp
-
-def decryption(data):
-    L = data >> 32
-    R = data & 0xffffffff
-    for i in range(17, 1, -1):
-        L = p[i]^L
-        L1 = func(L)
-        R = R^func(L1)
-        L,R = swap(L,R)
-    L,R = R, L
-    L = L^p[0]
-    R = R^p[1]
-    decrypted_data1 = (L<<32) ^ R
-    return decrypted_data1
-
-def bytes_xor(a, b) :
-    # Treat a and b as byte strings. Do a byte-wise logical XOR on them. If
-    # they differ in length, discard remaining elements from the longer one.
-    return bytes(x ^ y for x, y in zip(a, b))
-
-def blowfish_encrypt(password):
-    driver_key()
-    plaintext = password
-    total_message = []
-    total_message_hex = []
-    count_blocks = 0
-    for i in range(0, len(plaintext) // 8):
-        block = plaintext[i*8: (1+i)*8]
-        total_message.append(block)
-        block_hex = bytes(block, 'utf-8')
-        total_message_hex.append(block_hex.hex())
-        count_blocks += 1
-    if len(plaintext) % 8 != 0:
-        total_message.append(plaintext[8*count_blocks:])
-        total_message_hex.append(bytes(plaintext[8*count_blocks:], 'utf-8').hex())
-
-    print('Message to encrypt (ascii):  ', ''.join(total_message))
-    print('Hex value of the message:    ', ''.join(total_message_hex))
-    result_enc = []
-    result_dec = []
-    for message in total_message:
-        message_bytes = bytes(message, 'utf-8')
-
-        plain_16 = int(message_bytes.hex(), 16)
-        print('64b block:   ', bytearray.fromhex(message_bytes.hex()).decode())
-
-#print(hexlify(plaintext_bytes))
-#print(int(plain_16))
-#print(plaintext_bytes)
-#print(bytes(123))
-        print('hex: ', message_bytes.hex())
-    #m = literal_eval('0x' + plaintext_bytes.hex())
-    #print(plain_16.bit_length())
-        enc_dec_pair = driver(plain_16)
-        result_enc.append(enc_dec_pair[0])
-        result_dec.append(enc_dec_pair[1])
-
-    print('Encrypted:    ',''.join(result_enc))
-    print('Decrypted:   ', ''.join(result_dec))
-
-
-    return ''.join(result_enc), ''.join(result_dec)
-'''
-plaintext = 'some important message'
-total_message = []
-total_message_hex = []
-count_blocks = 0
-for i in range(0, len(plaintext) // 8):
-    block = plaintext[i*8: (1+i)*8]
-    total_message.append(block)
-    block_hex = bytes(block, 'utf8')
-    total_message_hex.append(block_hex.hex())
-    count_blocks += 1
-if len(plaintext) % 8 != 0:
-    total_message.append(plaintext[8*count_blocks:])
-    total_message_hex.append(bytes(plaintext[8*count_blocks:], 'utf8').hex())
-
-print('Message to encrypt (ascii):  ', ''.join(total_message))
-print('Hex value of the message:    ', ''.join(total_message_hex))
-result_enc = []
-result_dec = []
-for message in total_message:
-    message_bytes = bytes(message, 'utf8')
-
-    plain_16 = int(message_bytes.hex(), 16)
-    print('64b block:   ', bytearray.fromhex(message_bytes.hex()).decode())
-
-#print(hexlify(plaintext_bytes))
-#print(int(plain_16))
-#print(plaintext_bytes)
-#print(bytes(123))
-    print('hex: ', message_bytes.hex())
-    #m = literal_eval('0x' + plaintext_bytes.hex())
-    #print(plain_16.bit_length())
-    enc_dec_pair = driver(plain_16)
-    result_enc.append(enc_dec_pair[0])
-    result_dec.append(enc_dec_pair[1])
-
-
-print('Encrypted:    ',''.join(result_enc))
-print('Decrypted:   ', ''.join(result_dec))
-
-
-
-
-
- 
-OUTPUT
-Message to encrypt (ascii):   some important message
-Hex value of the message:     736f6d6520696d706f7274616e74206d657373616765
-64b block:    some imp
-hex:  736f6d6520696d70
-Encrypted data :  8bf4c538e009a1cd
-Decrypted data :  736f6d6520696d70
-64b block:    ortant m
-hex:  6f7274616e74206d
-Encrypted data :  4a050d219b055ecb
-Decrypted data :  6f7274616e74206d
-64b block:    essage
-hex:  657373616765
-Encrypted data :  aebacecbd659ae2a
-Decrypted data :  657373616765
-Encrypted:     8bf4c538e009a1cd4a050d219b055ecbaebacecbd659ae2a
-Decrypted:    736f6d6520696d706f7274616e74206d657373616765
-
-
-'''  
-
-
-def driver_dec(password):
-        '''
-        for i in range(0,18):
-            p[i] = p[i]^key[i%14]
-        k = 0
-        data = 0
-        for i in range(0,9):
-            temp = encryption(data)
-            p[k] = temp >> 32
-            k+=1
-            p[k] = temp & 0xffffffff
-            k+=1
-            data = temp
-        '''
         encrypt_data = password
-        decrypted_data = decryption(encrypt_data)
+        decrypted_data = self.decryption(encrypt_data)
         print("Decrypted data : ", str(hex(decrypted_data))[2:])
         result_dec = str(hex(decrypted_data))[2:]
         return result_dec
 
+    def blowfish_encrypt(self, password):
+        #self.driver_key()
+        plaintext = password
+        total_message = []
+        total_message_hex = []
+        count_blocks = 0
+        for i in range(0, len(plaintext) // 8):
+            block = plaintext[i*8: (1+i)*8]
+            total_message.append(block)
+            block_hex = bytes(block, 'utf-8')
+            total_message_hex.append(block_hex.hex())
+            count_blocks += 1
+        if len(plaintext) % 8 != 0:
+            total_message.append(plaintext[8*count_blocks:])
+            total_message_hex.append(bytes(plaintext[8*count_blocks:], 'utf-8').hex())
+
+        print('Message to encrypt (ascii):  ', ''.join(total_message))
+        print('Hex value of the message:    ', ''.join(total_message_hex))
+        result_enc = []
+        result_dec = []
+        for message in total_message:
+            message_bytes = bytes(message, 'utf-8')
+
+            plain_16 = int(message_bytes.hex(), 16)
+            print('64b block:   ', bytearray.fromhex(message_bytes.hex()).decode())
+            print('hex: ', message_bytes.hex())
+            enc_dec_pair = self.driver(plain_16)
+            result_enc.append(enc_dec_pair[0])
+            result_dec.append(enc_dec_pair[1])
+
+        print('Encrypted:    ',''.join(result_enc))
+        print('Decrypted:   ', ''.join(result_dec))
+        result_dec = ''.join(result_dec)
+        
+        print('DECR:    ', result_dec)
+        decrypted = bytes.fromhex(result_dec).decode()
+        self.enc = ''.join(result_enc)
+        self.dec = decrypted
+
+
+        return ''.join(result_enc), decrypted
 
 
 
 
-def blowfish_decrypt_string(password_hex):
-    driver_key()
-    print('Decryption')
-    plaintext = password_hex
-    total_message = []
-    total_message_int = []
-    count_blocks = 0
-    for i in range(0, len(plaintext) // 16):
-        block = plaintext[i*16: (1+i)*16]
-        total_message.append(block)
-        block_hex = int(block, 16)
-        total_message_int.append((block_hex))
-        count_blocks += 1
-    if len(plaintext) % 16 != 0:
-        total_message.append(plaintext[16*count_blocks:])
-        total_message_int.append(int(plaintext[16*count_blocks:], 16))
-    print('Total message to decrypt:    ', total_message)
-    print('Message to decrypt (ascii):  ', ''.join(total_message))
-    print('int value of the message:    ', total_message_int)
-    result_dec = []
-    for message in total_message_int:
-        hex_string_block = driver_dec(message)
-        print('Hex result:  ', hex_string_block)
-        char = bytes.fromhex(hex_string_block).decode() 
-        print('Char 8 bytes:    ', char)
-
-        result_dec.append(char)
-        decrypted = ''.join(result_dec)
-    print('DECRYPTED:   ', decrypted)
-
-    return decrypted
 
 
-blowfish_encrypt('mommommmoomom')
-blowfish_decrypt_string('fa7bd1f61771edf8a77c58cc090d7fda')
+
